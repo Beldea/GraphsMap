@@ -4,8 +4,7 @@ import java.util.HashMap;
 public class Main {
     public static void main(String[] args) throws IOException {
         Client client = new Client();
-        client.start();
-        client.sendMessage("move,0,1");
+        client.sendMessage("MOVE,00,01");
         System.out.println("1. TEST GRAFO ORIENTATO ");
 
         GraphOriented<String> go = new GraphOriented<>();
@@ -33,7 +32,7 @@ public class Main {
 
 
 
-        System.out.println("\n Struttura del Grafo Orientato ");
+        System.out.println(" Struttura del Grafo Orientato ");
         System.out.print(go);
 
         System.out.println(" Esecuzione Dijkstra (Sorgente: A) ");
