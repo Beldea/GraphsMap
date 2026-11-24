@@ -1,7 +1,6 @@
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public final class DungeonMap {
     private final GraphOriented<String> graph = new GraphOriented<>();
@@ -10,8 +9,8 @@ public final class DungeonMap {
     }
 
     /**
-     * Formato atteso:
-     * 0000[0001:1;0400:4]0400[0402:2]
+     * Formato:
+     * 0000[0001:1;0400:4]0400[0402:2;0600:2]
      */
     public static DungeonMap parse(String testo) {
         if (testo == null || testo.trim().isEmpty()) {
@@ -19,21 +18,23 @@ public final class DungeonMap {
         }
 
         DungeonMap mappa = new DungeonMap();
-        String[] nodi = testo.trim().split("]");
+        String[] nodi = testo.trim().split("\\]");
 
-        for (String parte : nodi) {
-            parte = parte.trim();
-            if (parte.isEmpty()) {
+        for (String nodoTesto : nodi) {
+            nodoTesto = nodoTesto.trim();
+
+            if (nodoTesto.isEmpty()) {
                 continue;
             }
 
-            int parentesi = parte.indexOf('[');
+            int parentesi = nodoTesto.indexOf('[');
             if (parentesi < 0) {
-                throw new IllegalArgumentException("Nodo senza lista di adiacenze: " + parte);
+                throw new IllegalArgumentException(
+                        "Nodo senza lista di adiacenze: " + nodoTesto);
             }
 
-            String sorgente = parte.substring(0, parentesi).trim();
-            String adiacenze = parte.substring(parentesi + 1).trim();
+            String sorgente = nodoTesto.substring(0, parentesi).trim();
+            String adiacenze = nodoTesto.substring(parentesi + 1).trim();
 
             validaId(sorgente);
             mappa.graph.addNode(sorgente);
@@ -43,18 +44,20 @@ public final class DungeonMap {
             }
 
             for (String adiacenza : adiacenze.split(";")) {
-                String[] campi = adiacenza.trim().split(":");
-                if (campi.length != 2) {
+                String[] dati = adiacenza.trim().split(":");
+
+                if (dati.length != 2) {
                     throw new IllegalArgumentException(
-                            "Adiacenza non valida '" + adiacenza + "' nel nodo " + sorgente);
+                            "Adiacenza non valida '" + adiacenza
+                                    + "' nel nodo " + sorgente);
                 }
 
-                String destinazione = campi[0].trim();
+                String destinazione = dati[0].trim();
                 validaId(destinazione);
 
                 float distanza;
                 try {
-                    distanza = Float.parseFloat(campi[1].trim());
+                    distanza = Float.parseFloat(dati[1].trim());
                 } catch (NumberFormatException e) {
                     throw new IllegalArgumentException(
                             "Distanza non valida nell'adiacenza '" + adiacenza + "'", e);
@@ -79,11 +82,26 @@ public final class DungeonMap {
         }
     }
 
+    public boolean containsNode(String id) {
+        HashMap<String, Distance<String>> distanze = graph.dijkstra(id);
+        return distanze.containsKey(id);
+    }
+
     public List<String> shortestPath(String partenza, String destinazione) {
+        if (!containsNode(partenza)) {
+            throw new IllegalArgumentException(
+                    "Nodo sorgente inesistente: " + partenza);
+        }
+        if (!containsNode(destinazione)) {
+            throw new IllegalArgumentException(
+                    "Nodo destinazione inesistente: " + destinazione);
+        }
+
         HashMap<String, Distance<String>> distanze = graph.dijkstra(partenza);
         Distance<String> arrivo = distanze.get(destinazione);
 
-        if (arrivo == null || arrivo.getDistance() == Float.POSITIVE_INFINITY) {
+        if (arrivo == null
+                || arrivo.getDistance() == Float.POSITIVE_INFINITY) {
             return new ArrayList<>();
         }
 
@@ -92,21 +110,24 @@ public final class DungeonMap {
 
         while (corrente != null) {
             percorso.add(0, corrente);
+
             if (corrente.equals(partenza)) {
                 break;
             }
 
-            Distance<String> info = distanze.get(corrente);
-            corrente = info == null ? null : info.getPrev();
+            Distance<String> informazioni = distanze.get(corrente);
+            corrente = informazioni == null ? null : informazioni.getPrev();
         }
 
-        if (percorso.isEmpty() || !percorso.get(0).equals(partenza)) {
+        if (percorso.isEmpty()
+                || !percorso.get(0).equals(partenza)) {
             return new ArrayList<>();
         }
+
         return percorso;
     }
 
-    public Map<String, Distance<String>> distancesFrom(String nodo) {
+    public HashMap<String, Distance<String>> distancesFrom(String nodo) {
         return graph.dijkstra(nodo);
     }
 

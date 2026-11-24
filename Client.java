@@ -25,10 +25,6 @@ public class Client implements AutoCloseable {
                 new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
     }
 
-    /**
-     * Esegue il login e restituisce la mappa ricevuta dal server.
-     * Il comando inviato è, ad esempio, "login,0".
-     */
     public DungeonMap login(int personaggio) throws IOException {
         if (personaggio < 0 || personaggio > 2) {
             throw new IllegalArgumentException("Il personaggio deve essere 0, 1 o 2");
@@ -37,27 +33,32 @@ public class Client implements AutoCloseable {
             throw new IllegalStateException("Connessione non avviata");
         }
 
-        // Se il server richiede "login 0", sostituire la virgola con uno spazio.
+        // Se il protocollo richiede "login 0", sostituire la riga con:
+        // out.println("login " + personaggio);
         out.println("login," + personaggio);
 
-        String risposta = leggiRisposta();
+        String risposta = readMessage();
         if (risposta == null) {
             throw new IOException("Connessione chiusa dal server durante il login");
         }
+
         if (risposta.startsWith("ERROR")) {
             throw new IOException("Errore del server: " + risposta);
         }
 
         String datiMappa;
+
         if (risposta.equals("MAP")) {
-            // Supporta anche il caso in cui MAP e il contenuto arrivino su righe diverse.
-            datiMappa = leggiRisposta();
+            datiMappa = readMessage();
             if (datiMappa == null) {
                 throw new IOException("Mappa non ricevuta dopo il messaggio MAP");
             }
         } else if (risposta.startsWith("MAP")) {
             datiMappa = risposta.substring(3).trim();
-            if (datiMappa.startsWith(",") || datiMappa.startsWith(":")) {
+
+            if (datiMappa.startsWith(",")
+                    || datiMappa.startsWith(":")
+                    || datiMappa.startsWith(" ")) {
                 datiMappa = datiMappa.substring(1).trim();
             }
         } else {
@@ -72,17 +73,13 @@ public class Client implements AutoCloseable {
         return DungeonMap.parse(datiMappa);
     }
 
-    /**
-     * Invia un comando e restituisce la risposta del server.
-     * Ad esempio, può essere usato per i comandi di movimento previsti dal server.
-     */
     public String sendCommand(String comando) throws IOException {
         if (!loggedIn) {
             throw new IllegalStateException("Effettuare il login prima di inviare comandi");
         }
 
         out.println(comando);
-        String risposta = leggiRisposta();
+        String risposta = readMessage();
 
         if (risposta == null) {
             throw new IOException("Connessione chiusa dal server");
@@ -90,17 +87,27 @@ public class Client implements AutoCloseable {
         if (risposta.startsWith("ERROR")) {
             throw new IOException("Errore del server: " + risposta);
         }
+
         return risposta;
     }
 
-    private String leggiRisposta() throws IOException {
+    public String sendMessage(String comando) throws IOException {
+        return sendCommand(comando);
+    }
+
+    public String readMessage() throws IOException {
+        if (in == null) {
+            throw new IllegalStateException("Connessione non avviata");
+        }
+
         String risposta = in.readLine();
         return risposta == null ? null : risposta.trim();
     }
 
-    /**
-     * Chiude la sessione inviando logout e poi chiude la socket.
-     */
+    public void stopConnection() throws IOException {
+        close();
+    }
+
     @Override
     public void close() throws IOException {
         IOException erroreChiusura = null;
@@ -136,12 +143,5 @@ public class Client implements AutoCloseable {
         if (erroreChiusura != null) {
             throw erroreChiusura;
         }
-    }
-
-    public String readMessage() throws IOException {
-        if (in == null) {
-            throw new IllegalStateException("Connessione non avviata");
-        }
-        return leggiRisposta();
     }
 }
