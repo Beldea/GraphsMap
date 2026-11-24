@@ -20,14 +20,14 @@ public class MapClient {
 
         try (Client client = new Client()) {
             client.start(HOST, PORTA);
-
-            DungeonMap mappa = client.login(personaggio);
+            Random random = new Random();
+            int randomplayer = random.nextInt(3) ;
+            DungeonMap mappa = client.login(randomplayer);
 
             System.out.println("Personaggio " + personaggio + " collegato.");
-            Thread.sleep(500);
             System.out.println("Mappa ricevuta:");
             System.out.println(mappa);
-
+            Thread.sleep(3000);
             if (mappa.getNodes().isEmpty()) {
                 throw new IllegalStateException("La mappa non contiene nodi");
             }
@@ -50,7 +50,6 @@ public class MapClient {
 
             // Il movimento casuale continua a scegliere destinazioni
             // e a raggiungerle con i percorsi minimi del grafo originale.
-            Random random = new Random();
             List<String> nodi = mappa.getNodes();
 
             String posizione = mappa.containsNode("0000") ? "0000" : radice;
