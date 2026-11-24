@@ -4,7 +4,6 @@ import java.util.HashMap;
 public class Main {
     public static void main(String[] args) throws IOException {
         Client client = new Client();
-        client.sendMessage("MOVE,00,01");
         System.out.println("1. TEST GRAFO ORIENTATO ");
 
         GraphOriented<String> go = new GraphOriented<>();
