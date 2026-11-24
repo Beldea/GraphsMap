@@ -68,6 +68,7 @@ public final class DungeonMap {
                 }
 
                 mappa.graph.addEdge(sorgente, destinazione, distanza);
+                mappa.graph.addEdge(destinazione, sorgente, distanza);
             }
         }
 
