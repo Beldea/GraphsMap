@@ -131,6 +131,10 @@ public final class DungeonMap {
         return graph.dijkstra(nodo);
     }
 
+    public List<String> getNodes() {
+        return new ArrayList<>(graph.nodes.keySet());
+    }
+
     @Override
     public String toString() {
         return graph.toString();

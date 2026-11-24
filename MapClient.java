@@ -1,47 +1,81 @@
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Scanner;
+import java.util.Random;
 
 public class MapClient {
     private static final String HOST = "127.0.0.1";
     private static final int PORTA = 9000;
 
     public static void main(String[] args) throws IOException {
-        int personaggio = args.length > 0
-                ? Integer.parseInt(args[0])
-                : 0;
+        int personaggio = args.length > 0 ? Integer.parseInt(args[0]) : 0;
 
         if (personaggio < 0 || personaggio > 2) {
-            throw new IllegalArgumentException(
-                    "Il personaggio deve essere 0, 1 o 2");
+            throw new IllegalArgumentException("Il personaggio deve essere 0, 1 o 2");
         }
 
-        try (Client client = new Client();
-             Scanner console = new Scanner(System.in)) {
-
+        try (Client client = new Client()) {
             client.start(HOST, PORTA);
 
             DungeonMap mappa = client.login(personaggio);
-            System.out.println("Login effettuato come personaggio " + personaggio);
+            Random random = new Random();
+
+            System.out.println("Personaggio " + personaggio + " collegato.");
             System.out.println("Mappa ricevuta:");
             System.out.println(mappa);
 
-            String partenza = "0000";
-            String destinazione = "0602";
+            String posizione = "0000";
+            List<String> nodi = mappa.getNodes();
 
-            List<String> percorso = mappa.shortestPath(partenza, destinazione);
-            if (percorso.isEmpty()) {
-                System.out.println(
-                        "Nessun percorso da " + partenza + " a " + destinazione);
-            } else {
-                System.out.println("Percorso da " + partenza + " a " + destinazione + ":");
-                System.out.println(String.join(" -> ", percorso));
+            if (nodi.isEmpty()) {
+                throw new IllegalStateException("La mappa non contiene nodi");
             }
 
-            System.out.println();
-            System.out.println("Personaggio ancora collegato.");
-            System.out.println("Premi Invio per uscire e inviare logout.");
-            console.nextLine();
+            if (!nodi.contains(posizione)) {
+                posizione = nodi.get(random.nextInt(nodi.size()));
+            }
+
+            System.out.println("Posizione iniziale: " + posizione);
+
+            while (true) {
+                List<String> raggiungibili = new ArrayList<>(nodi);
+                raggiungibili.remove(posizione);
+
+                if (raggiungibili.isEmpty()) {
+                    break;
+                }
+
+                String destinazione;
+                do {
+                    destinazione = raggiungibili.get(random.nextInt(raggiungibili.size()));
+                } while (!mappa.containsNode(destinazione));
+
+                List<String> percorso = mappa.shortestPath(posizione, destinazione);
+
+                if (percorso.isEmpty() || percorso.size() < 2) {
+                    continue;
+                }
+
+                for (int i = 1; i < percorso.size(); i++) {
+                    NodeMap passo = new NodeMap(percorso.get(i));
+                    String risposta = client.sendCommand(
+                            "move," + passo.getColonna() + "," + passo.getRiga());
+
+                    System.out.println(
+                            "move " + passo.getColonna() + "," + passo.getRiga()
+                                    + " -> " + risposta);
+
+                    posizione = percorso.get(i);
+
+                    try {
+                        Thread.sleep(300);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+            }
         }
     }
 }
