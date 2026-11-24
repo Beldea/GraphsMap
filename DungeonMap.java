@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public final class DungeonMap {
     private final GraphOriented<String> graph = new GraphOriented<>();
@@ -22,7 +23,6 @@ public final class DungeonMap {
 
         for (String nodoTesto : nodi) {
             nodoTesto = nodoTesto.trim();
-
             if (nodoTesto.isEmpty()) {
                 continue;
             }
@@ -45,7 +45,6 @@ public final class DungeonMap {
 
             for (String adiacenza : adiacenze.split(";")) {
                 String[] dati = adiacenza.trim().split(":");
-
                 if (dati.length != 2) {
                     throw new IllegalArgumentException(
                             "Adiacenza non valida '" + adiacenza
@@ -59,13 +58,13 @@ public final class DungeonMap {
                 try {
                     distanza = Float.parseFloat(dati[1].trim());
                 } catch (NumberFormatException e) {
-                    throw new IllegalArgumentException(
-                            "Distanza non valida nell'adiacenza '" + adiacenza + "'", e);
+                    throw new IllegalArgumentException("Distanza non valida nell'adiacenza '" + adiacenza + "'", e);
                 }
 
                 if (!Float.isFinite(distanza) || distanza < 0) {
                     throw new IllegalArgumentException(
-                            "La distanza deve essere finita e non negativa: " + distanza);
+                            "La distanza deve essere finita e non negativa: "
+                                    + distanza);
                 }
 
                 mappa.graph.addEdge(sorgente, destinazione, distanza);
@@ -76,15 +75,18 @@ public final class DungeonMap {
     }
 
     private static void validaId(String id) {
-        if (!id.matches("\\d{4}")) {
+        if (id == null || !id.matches("\\d{4}")) {
             throw new IllegalArgumentException(
                     "Identificativo nodo non valido (attese 4 cifre): " + id);
         }
     }
 
     public boolean containsNode(String id) {
-        HashMap<String, Distance<String>> distanze = graph.dijkstra(id);
-        return distanze.containsKey(id);
+        return graph.nodes.containsKey(id);
+    }
+
+    public List<String> getNodes() {
+        return new ArrayList<>(graph.nodes.keySet());
     }
 
     public List<String> shortestPath(String partenza, String destinazione) {
@@ -110,7 +112,6 @@ public final class DungeonMap {
 
         while (corrente != null) {
             percorso.add(0, corrente);
-
             if (corrente.equals(partenza)) {
                 break;
             }
@@ -119,20 +120,73 @@ public final class DungeonMap {
             corrente = informazioni == null ? null : informazioni.getPrev();
         }
 
-        if (percorso.isEmpty()
-                || !percorso.get(0).equals(partenza)) {
+        if (percorso.isEmpty() || !percorso.get(0).equals(partenza)) {
             return new ArrayList<>();
         }
 
         return percorso;
     }
 
-    public HashMap<String, Distance<String>> distancesFrom(String nodo) {
-        return graph.dijkstra(nodo);
+    /**
+     * Calcola l'albero di copertura minimo della componente connessa
+     * contenente la radice indicata, usando l'algoritmo di Prim.
+     *
+     * Gli archi ricevuti dalla mappa sono convertiti in archi non orientati.
+     * Se la mappa contiene lo stesso arco in entrambe le direzioni con pesi
+     * diversi, viene usato il peso minore.
+     */
+    public GraphNotOriented<String> minimumSpanningTreeFrom(String radice) {
+        if (!containsNode(radice)) {
+            throw new IllegalArgumentException(
+                    "Nodo radice inesistente nella mappa: " + radice);
+        }
+
+        GraphNotOriented<String> grafoNonOrientato =
+                new GraphNotOriented<>();
+
+        for (String nodo : getNodes()) {
+            grafoNonOrientato.addNode(nodo);
+        }
+
+        // La chiave canonica evita di aggiungere due volte lo stesso arco
+        // quando la mappa lo descrive in entrambe le direzioni.
+        HashMap<String, Float> pesiArchi = new HashMap<>();
+
+        for (Map.Entry<String, HashMap<String, Adiacenza<String>>> entry
+                : graph.nodes.entrySet()) {
+            String sorgente = entry.getKey();
+
+            for (Adiacenza<String> adiacenza : entry.getValue().values()) {
+                String destinazione = adiacenza.getNodo();
+
+                String primo = sorgente.compareTo(destinazione) <= 0
+                        ? sorgente : destinazione;
+                String secondo = sorgente.compareTo(destinazione) <= 0
+                        ? destinazione : sorgente;
+                String chiave = primo + ":" + secondo;
+
+                Float pesoEsistente = pesiArchi.get(chiave);
+                if (pesoEsistente == null
+                        || adiacenza.getPeso() < pesoEsistente) {
+                    pesiArchi.put(chiave, adiacenza.getPeso());
+                }
+            }
+        }
+
+        for (Map.Entry<String, Float> entry : pesiArchi.entrySet()) {
+            String[] estremi = entry.getKey().split(":");
+            grafoNonOrientato.addEdge(
+                    estremi[0],
+                    estremi[1],
+                    entry.getValue());
+        }
+
+        // Prim calcola l'MST a partire da questa radice.
+        return grafoNonOrientato.prim(radice);
     }
 
-    public List<String> getNodes() {
-        return new ArrayList<>(graph.nodes.keySet());
+    public HashMap<String, Distance<String>> distancesFrom(String nodo) {
+        return graph.dijkstra(nodo);
     }
 
     @Override
