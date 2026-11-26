@@ -22,7 +22,7 @@ public class MapClient {
             client.start(HOST, PORTA);
             int nPersonaggio = (int)(Math.random() * 3);
             DungeonMap mappa = client.login(nPersonaggio);
-            Thread.sleep(5000);
+            Thread.sleep(1000);
 
             System.out.println("Personaggio " + personaggio + " collegato.");
             System.out.println("Mappa ricevuta:");
