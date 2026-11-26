@@ -28,8 +28,7 @@ public class Client implements AutoCloseable {
 
     public DungeonMap login(int personaggio) throws IOException {
         if (personaggio < 0 || personaggio > 2) {
-            throw new IllegalArgumentException(
-                    "Il personaggio deve essere 0, 1 o 2");
+            throw new IllegalArgumentException("Il personaggio deve essere 0, 1 o 2");
         }
         if (socket == null || socket.isClosed()) {
             throw new IllegalStateException("Connessione non avviata");

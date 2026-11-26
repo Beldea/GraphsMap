@@ -22,11 +22,11 @@ public class MapClient {
             client.start(HOST, PORTA);
             int nPersonaggio = (int)(Math.random() * 3);
             DungeonMap mappa = client.login(nPersonaggio);
+            Thread.sleep(5000);
 
             System.out.println("Personaggio " + personaggio + " collegato.");
             System.out.println("Mappa ricevuta:");
             System.out.println(mappa);
-            Thread.sleep(1000);
 
             if (mappa.getNodes().isEmpty()) {
                 throw new IllegalStateException("La mappa non contiene nodi");
