@@ -21,13 +21,14 @@ public class MapClient {
         try (Client client = new Client()) {
             client.start(HOST, PORTA);
             Random random = new Random();
-            int randomplayer = random.nextInt(3) ;
+            int randomplayer = random.nextInt(3);
             DungeonMap mappa = client.login(randomplayer);
 
             System.out.println("Personaggio " + personaggio + " collegato.");
             System.out.println("Mappa ricevuta:");
             System.out.println(mappa);
             Thread.sleep(3000);
+
             if (mappa.getNodes().isEmpty()) {
                 throw new IllegalStateException("La mappa non contiene nodi");
             }
@@ -42,16 +43,14 @@ public class MapClient {
                         "La radice non è presente nella mappa: " + radice);
             }
 
-            GraphNotOriented<String> mst = mappa.minimumSpanningTreeFrom(radice);
+            GraphNotOriented<String> mst =
+                    mappa.minimumSpanningTreeFrom(radice);
 
             System.out.println();
             System.out.println("Minimum spanning tree con radice " + radice + ":");
             System.out.println(mst);
 
-            // Il movimento casuale continua a scegliere destinazioni
-            // e a raggiungerle con i percorsi minimi del grafo originale.
             List<String> nodi = mappa.getNodes();
-
             String posizione = mappa.containsNode("0000") ? "0000" : radice;
 
             System.out.println("Posizione iniziale: " + posizione);
@@ -72,14 +71,18 @@ public class MapClient {
                 }
 
                 if (destinazioniRaggiungibili.isEmpty()) {
-                    System.out.println("Nessun altro nodo raggiungibile da " + posizione + ".");
+                    System.out.println(
+                            "Nessun altro nodo raggiungibile da "
+                                    + posizione + ".");
                     break;
                 }
 
                 String destinazione = destinazioniRaggiungibili.get(
                         random.nextInt(destinazioniRaggiungibili.size()));
 
-                List<String> percorso = mappa.shortestPath(posizione, destinazione);
+                List<String> percorso =
+                        mappa.shortestPath(posizione, destinazione);
+
                 if (percorso.size() < 2) {
                     System.out.println("Percorso non valido da "
                             + posizione + " a " + destinazione + "; termino.");
@@ -94,10 +97,18 @@ public class MapClient {
                             + passo.getColonna() + ","
                             + passo.getRiga();
 
-                    String risposta = client.sendCommand(comando);
-                    System.out.println(comando + " -> " + risposta);
+                    System.out.println("Invio comando: " + comando);
 
-                    posizione = percorso.get(i);
+                    try {
+                        String risposta = client.sendCommand(comando);
+                        System.out.println(comando + " -> " + risposta);
+
+                        posizione = percorso.get(i);
+                    } catch (IOException e) {
+                        System.out.println("Movimento rifiutato: " + e.getMessage());
+                        posizione = null;
+                        break;
+                    }
 
                     try {
                         Thread.sleep(500);
@@ -105,6 +116,10 @@ public class MapClient {
                         Thread.currentThread().interrupt();
                         return;
                     }
+                }
+
+                if (posizione == null) {
+                    break;
                 }
             }
         } catch (InterruptedException e) {
