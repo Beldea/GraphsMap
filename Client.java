@@ -28,64 +28,63 @@ public class Client implements AutoCloseable {
 
     public DungeonMap login(int personaggio) throws IOException {
         if (personaggio < 0 || personaggio > 2) {
-            throw new IllegalArgumentException("Il personaggio deve essere 0, 1 o 2");
+            throw new IllegalArgumentException(
+                    "Il personaggio deve essere 0, 1 o 2");
         }
         if (socket == null || socket.isClosed()) {
             throw new IllegalStateException("Connessione non avviata");
         }
 
         posizioneIniziale = null;
+
         out.println("login," + personaggio);
-        String datiMappa = null;
 
-        // Si aspetta entrambe le informazioni del login:
-        // mappa e posizione iniziale START,colonna,riga.
-        while (datiMappa == null || posizioneIniziale == null) {
-            String risposta = readMessage();
+        String risposta = readMessage();
+        if (risposta == null) {
+            throw new IOException("Connessione chiusa dal server durante il login");
+        }
 
+        if (risposta.startsWith("ERROR")) {
+            throw new IOException("Errore del server: " + risposta);
+        }
+
+        // Se il server restituisce prima START,colonna,riga,
+        // memorizza la posizione e leggi la successiva riga.
+        if (risposta.startsWith("START")) {
+            posizioneIniziale = parsePosizione(risposta);
+
+            risposta = readMessage();
             if (risposta == null) {
                 throw new IOException(
-                        "Connessione chiusa durante il login");
+                        "Connessione chiusa durante la ricezione della mappa");
             }
-            if (risposta.startsWith("ERROR")) {
-                throw new IOException("Errore del server: " + risposta);
-            }
+        }
 
-            if (risposta.startsWith("START")) {
-                posizioneIniziale = parsePosizione(risposta);
-            } else if (risposta.equals("MAP")) {
-                datiMappa = readMessage();
-                if (datiMappa == null) {
-                    throw new IOException(
-                            "Mappa non ricevuta dopo il messaggio MAP");
-                }
-            } else if (risposta.startsWith("MAP")) {
-                datiMappa = risposta.substring(3).trim();
+        String datiMappa;
 
-                if (datiMappa.startsWith(",")
-                        || datiMappa.startsWith(":")) {
-                    datiMappa = datiMappa.substring(1).trim();
-                }
-            } else {
-                throw new IOException(
-                        "Risposta di login inattesa: " + risposta);
+        if (risposta.equals("MAP")) {
+            datiMappa = readMessage();
+            if (datiMappa == null) {
+                throw new IOException("Mappa non ricevuta dopo il messaggio MAP");
             }
+        } else if (risposta.startsWith("MAP")) {
+            datiMappa = risposta.substring(3).trim();
+
+            if (datiMappa.startsWith(",")
+                    || datiMappa.startsWith(":")
+                    || datiMappa.startsWith(" ")) {
+                datiMappa = datiMappa.substring(1).trim();
+            }
+        } else {
+            throw new IOException("Risposta di login inattesa: " + risposta);
         }
 
         if (datiMappa.isEmpty()) {
             throw new IOException("Il server ha inviato una mappa vuota");
         }
 
-        DungeonMap mappa = DungeonMap.parse(datiMappa);
-
-        if (!mappa.containsNode(posizioneIniziale)) {
-            throw new IOException(
-                    "La posizione iniziale " + posizioneIniziale
-                            + " non è presente nella mappa");
-        }
-
         loggedIn = true;
-        return mappa;
+        return DungeonMap.parse(datiMappa);
     }
 
     private String parsePosizione(String risposta) throws IOException {
