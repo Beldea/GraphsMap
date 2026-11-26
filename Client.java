@@ -11,6 +11,7 @@ public class Client implements AutoCloseable {
     private PrintWriter out;
     private BufferedReader in;
     private boolean loggedIn;
+    private String posizioneIniziale;
 
     public void start() throws IOException {
         start("127.0.0.1", 9000);
@@ -27,14 +28,15 @@ public class Client implements AutoCloseable {
 
     public DungeonMap login(int personaggio) throws IOException {
         if (personaggio < 0 || personaggio > 2) {
-            throw new IllegalArgumentException("Il personaggio deve essere 0, 1 o 2");
+            throw new IllegalArgumentException(
+                    "Il personaggio deve essere 0, 1 o 2");
         }
         if (socket == null || socket.isClosed()) {
             throw new IllegalStateException("Connessione non avviata");
         }
 
-        // Se il protocollo richiede "login 0", sostituire la riga con:
-        // out.println("login " + personaggio);
+        posizioneIniziale = null;
+
         out.println("login," + personaggio);
 
         String risposta = readMessage();
@@ -44,6 +46,18 @@ public class Client implements AutoCloseable {
 
         if (risposta.startsWith("ERROR")) {
             throw new IOException("Errore del server: " + risposta);
+        }
+
+        // Se il server restituisce prima START,colonna,riga,
+        // memorizza la posizione e leggi la successiva riga.
+        if (risposta.startsWith("START")) {
+            posizioneIniziale = parsePosizione(risposta);
+
+            risposta = readMessage();
+            if (risposta == null) {
+                throw new IOException(
+                        "Connessione chiusa durante la ricezione della mappa");
+            }
         }
 
         String datiMappa;
@@ -73,17 +87,38 @@ public class Client implements AutoCloseable {
         return DungeonMap.parse(datiMappa);
     }
 
+    private String parsePosizione(String risposta) throws IOException {
+        String[] dati = risposta.split(",");
+        if (dati.length != 3) {
+            throw new IOException("Risposta START non valida: " + risposta);
+        }
+
+        try {
+            int colonna = Integer.parseInt(dati[1].trim());
+            int riga = Integer.parseInt(dati[2].trim());
+            return NodeMap.buildId(riga, colonna);
+        } catch (NumberFormatException e) {
+            throw new IOException("Risposta START non valida: " + risposta, e);
+        }
+    }
+
+    public String getPosizioneIniziale() {
+        return posizioneIniziale;
+    }
+
     public String sendCommand(String comando) throws IOException {
         if (!loggedIn) {
-            throw new IllegalStateException("Effettuare il login prima di inviare comandi");
+            throw new IllegalStateException(
+                    "Effettuare il login prima di inviare comandi");
         }
 
         out.println(comando);
-        String risposta = readMessage();
 
+        String risposta = readMessage();
         if (risposta == null) {
             throw new IOException("Connessione chiusa dal server");
         }
+
         if (risposta.startsWith("ERROR")) {
             throw new IOException("Errore del server: " + risposta);
         }

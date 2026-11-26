@@ -1,8 +1,8 @@
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
-import java.util.HashMap;
 
 public class MapClient {
     private static final String HOST = "127.0.0.1";
@@ -20,9 +20,8 @@ public class MapClient {
 
         try (Client client = new Client()) {
             client.start(HOST, PORTA);
-            Random random = new Random();
-            int randomplayer = random.nextInt(3);
-            DungeonMap mappa = client.login(randomplayer);
+
+            DungeonMap mappa = client.login(personaggio);
 
             System.out.println("Personaggio " + personaggio + " collegato.");
             System.out.println("Mappa ricevuta:");
@@ -33,7 +32,6 @@ public class MapClient {
                 throw new IllegalStateException("La mappa non contiene nodi");
             }
 
-            // Secondo argomento facoltativo: nodo di partenza dell'MST.
             String radice = args.length > 1
                     ? args[1]
                     : mappa.getNodes().get(0);
@@ -50,8 +48,18 @@ public class MapClient {
             System.out.println("Minimum spanning tree con radice " + radice + ":");
             System.out.println(mst);
 
+            Random random = new Random();
             List<String> nodi = mappa.getNodes();
-            String posizione = mappa.containsNode("0000") ? "0000" : radice;
+
+            String posizione = client.getPosizioneIniziale();
+            if (posizione == null) {
+                posizione = mappa.containsNode("0000") ? "0000" : radice;
+            }
+
+            if (!mappa.containsNode(posizione)) {
+                throw new IllegalStateException(
+                        "Posizione iniziale non presente nella mappa: " + posizione);
+            }
 
             System.out.println("Posizione iniziale: " + posizione);
 
@@ -59,13 +67,16 @@ public class MapClient {
                 HashMap<String, Distance<String>> distanze =
                         mappa.distancesFrom(posizione);
 
-                List<String> destinazioniRaggiungibili = new ArrayList<>();
+                List<String> destinazioniRaggiungibili =
+                        new ArrayList<>();
+
                 for (String nodo : nodi) {
                     Distance<String> distanza = distanze.get(nodo);
 
                     if (!nodo.equals(posizione)
                             && distanza != null
-                            && distanza.getDistance() != Float.POSITIVE_INFINITY) {
+                            && distanza.getDistance()
+                            != Float.POSITIVE_INFINITY) {
                         destinazioniRaggiungibili.add(nodo);
                     }
                 }
@@ -77,22 +88,29 @@ public class MapClient {
                     break;
                 }
 
-                String destinazione = destinazioniRaggiungibili.get(
-                        random.nextInt(destinazioniRaggiungibili.size()));
+                String destinazione =
+                        destinazioniRaggiungibili.get(
+                                random.nextInt(
+                                        destinazioniRaggiungibili.size()));
 
                 List<String> percorso =
                         mappa.shortestPath(posizione, destinazione);
 
                 if (percorso.size() < 2) {
                     System.out.println("Percorso non valido da "
-                            + posizione + " a " + destinazione + "; termino.");
+                            + posizione + " a " + destinazione
+                            + "; termino.");
                     break;
                 }
 
-                System.out.println("Destinazione casuale: " + destinazione);
+                System.out.println(
+                        "Destinazione casuale: " + destinazione);
+
+                boolean percorsoCompletato = true;
 
                 for (int i = 1; i < percorso.size(); i++) {
                     NodeMap passo = new NodeMap(percorso.get(i));
+
                     String comando = "move,"
                             + passo.getColonna() + ","
                             + passo.getRiga();
@@ -103,26 +121,28 @@ public class MapClient {
                         String risposta = client.sendCommand(comando);
                         System.out.println(comando + " -> " + risposta);
 
+                        // Aggiorna la posizione solo dopo una
+                        // risposta positiva del server.
                         posizione = percorso.get(i);
-                    } catch (IOException e) {
-                        System.out.println("Movimento rifiutato: " + e.getMessage());
-                        posizione = null;
-                        break;
-                    }
 
-                    try {
                         Thread.sleep(500);
+                    } catch (IOException e) {
+                        System.out.println(
+                                "Movimento rifiutato: " + e.getMessage());
+                        percorsoCompletato = false;
+                        break;
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         return;
                     }
                 }
 
-                if (posizione == null) {
+                if (!percorsoCompletato) {
                     break;
                 }
             }
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new RuntimeException(e);
         }
     }
